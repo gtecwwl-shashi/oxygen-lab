@@ -6,6 +6,8 @@ All learner state is session-local. No persistent learner database is used.
 from __future__ import annotations
 
 import csv
+import hashlib
+import hmac
 import io
 import json
 import math
@@ -555,16 +557,54 @@ Built for Prof Madapura Shashidhara's MMed/DM and Primary FRCA teaching. AI-assi
 """)
 
 
+def tutor_access():
+    """Unlock this browser session using a code kept in Streamlit Secrets."""
+    try:
+        configured = st.secrets.get("tutor_access_code", "")
+    except (FileNotFoundError, KeyError):
+        configured = ""
+    configured = configured if isinstance(configured, str) else ""
+    fingerprint = hashlib.sha256(configured.encode()).hexdigest() if configured else ""
+    unlocked = bool(fingerprint) and hmac.compare_digest(
+        st.session_state.get("tutor_access_fingerprint", ""), fingerprint
+    )
+    with st.expander("Tutor / teaching access"):
+        if unlocked:
+            st.success("Teaching access unlocked in this browser session.")
+            if st.button("Lock teaching access", key="lock_teaching"):
+                st.session_state.pop("tutor_access_fingerprint", None)
+                st.rerun()
+        elif not configured:
+            st.caption("Assessments are ready. To enable teaching access, the app owner must set tutor_access_code in Streamlit App settings → Secrets.")
+        else:
+            with st.form("tutor_access_form", clear_on_submit=True):
+                entered = st.text_input("Tutor access code", type="password", key="tutor_code_entry", max_chars=256)
+                submitted = st.form_submit_button("Unlock teaching access")
+            if submitted:
+                if hmac.compare_digest(entered.encode(), configured.encode()):
+                    st.session_state["tutor_access_fingerprint"] = fingerprint
+                    st.rerun()
+                else:
+                    st.error("Access code not recognised.")
+    return unlocked
+
+
 def main():
     st.set_page_config(page_title="Oxygen Lab · MMed / DM / FRCA",page_icon="🫁",layout="wide")
     st.markdown("<style>.block-container{max-width:1180px;padding-top:2rem}h1,h2,h3{color:#003B71}div[data-testid='stMetric']{background:#edf5fb;padding:16px;border-radius:9px}section[data-testid='stSidebar']{background:#f1f6fa}</style>",unsafe_allow_html=True)
     st.title("Oxygen Lab")
-    st.caption("Explore → calculate → sketch → test · MMed / DM / Primary FRCA")
+    st.caption("Individual assessment · MMed / DM / Primary FRCA")
     with st.sidebar:
-        st.header("Learning workspace")
+        st.header("Assessment workspace")
         learner = st.text_input("Learner code",max_chars=80,key="learner_code",placeholder="e.g. DM-01",help="Use a code rather than a full name. It is captured when an assessment starts.")
         unit = st.radio("Pressure units",["kPa","mmHg"],key="units",horizontal=True)
-        page = st.radio("Open",["Oxygen cascade","Oxygen transport","My results","Tutor review","Sources & assumptions"],key="page")
+        unlocked = tutor_access()
+        pages = ["Oxygen cascade", "Oxygen transport", "My results"]
+        if unlocked:
+            pages += ["Teaching room", "Tutor review", "Sources & assumptions"]
+        if st.session_state.get("page") not in pages:
+            st.session_state["page"] = pages[0]
+        page = st.radio("Open", pages, key="page")
         st.caption("Each browser connection has its own session. Download results before refreshing. No login or central database is included.")
         if st.button("Clear session for next learner",key="clear_session"):
             for key in list(st.session_state):
@@ -572,19 +612,22 @@ def main():
             st.rerun()
     if page in ("Oxygen cascade","Oxygen transport"):
         topic = "cascade" if page=="Oxygen cascade" else "transport"
+        st.header(TOPICS[topic])
+        assessment(topic,unit,learner)
+    elif page == "Teaching room" and unlocked:
+        selected = st.selectbox("Teaching topic", list(TOPICS.values()), key="teaching_topic")
+        topic = "cascade" if selected == "Oxygen cascade" else "transport"
         lesson(topic)
-        mode = st.radio("Activity",["Explore & calculate","Sketch & viva","Assessment"],horizontal=True,key=f"mode_{topic}")
+        mode = st.radio("Activity",["Explore & calculate","Sketch & viva"],horizontal=True,key=f"mode_{topic}")
         if mode=="Explore & calculate":
             cascade_lab(unit) if topic=="cascade" else transport_lab(unit)
         elif mode=="Sketch & viva":
             sketch_viva(topic)
-        else:
-            assessment(topic,unit,learner)
     elif page=="My results":
         reports()
-    elif page=="Tutor review":
+    elif page=="Tutor review" and unlocked:
         tutor_dashboard()
-    else:
+    elif page=="Sources & assumptions" and unlocked:
         references()
 
 
