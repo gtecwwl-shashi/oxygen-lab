@@ -184,6 +184,30 @@ def make_questions(topic, seed=0, unit="kPa"):
                 "It halves",
                 "DO₂ is directly proportional to cardiac output when CaO₂ is fixed. Halving blood flow halves delivery. This is why a normal saturation alone cannot demonstrate adequate tissue oxygen delivery."),
         ]
+    if topic == "transport":
+        q.extend([
+            mcq('t_axes', 2, 'Which axes should you label on an oxyhaemoglobin dissociation curve?', ['PO₂ (kPa) horizontally; haemoglobin saturation (%) vertically', 'Haemoglobin concentration horizontally; PO₂ vertically', 'Cardiac output horizontally; saturation vertically', 'Saturation horizontally; oxygen delivery vertically'], 'PO₂ (kPa) horizontally; haemoglobin saturation (%) vertically', 'The curve relates oxygen partial pressure to haemoglobin saturation. It does not directly plot oxygen content or delivery. Always label units and state reference conditions.'),
+            mcq('t_steep', 2, 'What does the steep part of the dissociation curve help the tissues do?', ['Extract a substantial amount of oxygen for a relatively small fall in PO₂', 'Maintain identical saturation at every tissue PO₂', 'Increase the amount of haemoglobin in each red cell', 'Prevent oxygen leaving haemoglobin'], 'Extract a substantial amount of oxygen for a relatively small fall in PO₂', 'Along the steep region, a modest fall in PO₂ produces a relatively large fall in saturation. Oxygen is released from haemoglobin and can diffuse into the tissues. This is movement along a curve, not necessarily a shift of the curve.'),
+            mcq('t_left', 2, 'At the same PO₂, what does a left-shifted curve mean?', ['Higher oxygen affinity, lower P₅₀ and higher saturation', 'Lower oxygen affinity, higher P₅₀ and lower saturation', 'Higher haemoglobin concentration with unchanged affinity', 'Higher cardiac output with unchanged affinity'], 'Higher oxygen affinity, lower P₅₀ and higher saturation', 'A left shift means haemoglobin binds oxygen more readily: less PO₂ is needed for 50% saturation. At a fixed tissue PO₂ it holds onto more oxygen, which can make unloading more difficult. Affinity and total oxygen delivery are different concepts.'),
+            mcq('t_cold', 2, 'A patient becomes colder. With pH, CO₂ and 2,3-DPG unchanged, which change is expected?', ['A left shift with increased oxygen affinity', 'A right shift with decreased oxygen affinity', 'A rise in haemoglobin concentration without any affinity change', 'A right shift with decreased P₅₀'], 'A left shift with increased oxygen affinity', 'Lower temperature favours a left shift and lower P₅₀. Higher temperature has the opposite effect. The statement concerns haemoglobin affinity with the other variables held constant.'),
+            mcq('t_alkalosis', 2, 'Blood pH rises while temperature and 2,3-DPG remain unchanged. What happens to the oxygen dissociation curve?', ['It shifts left, increasing oxygen affinity', 'It shifts right, decreasing oxygen affinity', 'Its shift is determined only by haemoglobin concentration', 'Its P₅₀ rises because oxygen affinity increases'], 'It shifts left, increasing oxygen affinity', 'Higher pH means fewer hydrogen ions. This favours higher oxygen affinity and a left shift. Lower pH favours a right shift and oxygen unloading: this pH dependence is part of the Bohr effect.'),
+            mcq('t_dpg', 2, 'Why does an increase in red-cell 2,3-DPG shift the curve to the right?', ['It stabilises deoxygenated haemoglobin, reducing oxygen affinity', 'It increases the dissolved oxygen pressure directly', 'It converts adult haemoglobin into fetal haemoglobin', 'It adds extra oxygen-binding sites to haemoglobin'], 'It stabilises deoxygenated haemoglobin, reducing oxygen affinity', '2,3-DPG, also called 2,3-BPG, binds preferentially to deoxygenated adult haemoglobin and stabilises its lower-affinity state. More PO₂ is then needed for 50% saturation, so P₅₀ rises. This can aid unloading.'),
+            mcq('t_along', 2, 'PO₂ falls, but pH, temperature, CO₂, 2,3-DPG and haemoglobin type stay the same. How should you describe the resulting fall in saturation?', ['Movement down the same dissociation curve', 'A right shift of the entire curve', 'A left shift of the entire curve', 'A necessary change in P₅₀'], 'Movement down the same dissociation curve', 'Changing PO₂ alone moves the operating point along the existing curve. A shift means saturation at the same PO₂ has changed because affinity has changed. Do not call every fall in saturation a right shift.'),
+            mcq('t_hbf', 2, 'Why does fetal haemoglobin have a higher oxygen affinity than adult haemoglobin in red cells?', ['Its gamma chains interact less strongly with 2,3-DPG', 'It has more than four oxygen-binding sites', 'It contains no haem groups', 'It binds 2,3-DPG more strongly than adult haemoglobin'], 'Its gamma chains interact less strongly with 2,3-DPG', 'Fetal haemoglobin has gamma rather than beta chains and interacts less strongly with 2,3-DPG. Its curve is therefore relatively left-shifted, helping oxygen uptake at the lower PO₂ found in the placenta. This intrinsic difference is separate from the dynamic double Bohr effect.'),
+            mcq('t_stored', 2, 'During storage, red-cell 2,3-DPG falls. What is the expected effect on oxygen affinity?', ['Affinity increases and the curve shifts left', 'Affinity decreases and the curve shifts right', 'The number of oxygen-binding sites increases', 'Haemoglobin loses all ability to carry oxygen'], 'Affinity increases and the curve shifts left', 'Reduced 2,3-DPG means less stabilisation of deoxygenated haemoglobin, so affinity increases and P₅₀ falls. The effect on an actual transfused patient also depends on other physiological factors; stored red cells can still carry oxygen.'),
+            mcq('t_co', 1, 'How does carbon monoxide impair oxygen carriage and unloading?', ['It occupies haemoglobin sites and increases oxygen affinity at remaining sites', 'It only lowers dissolved oxygen without affecting haemoglobin', 'It increases available oxygen-binding capacity', 'It shifts the remaining oxygen-binding sites to lower affinity'], 'It occupies haemoglobin sites and increases oxygen affinity at remaining sites', 'Carbon monoxide reduces the haemoglobin capacity available for oxygen and favours a left shift at the remaining oxygen-binding sites, impairing unloading. PaO₂ can remain normal because it reflects dissolved oxygen. A normal PaO₂ therefore does not exclude impaired oxygen carriage.'),
+            mcq('t_bohr', 2, 'What is the Bohr effect?', ['Increased CO₂ and/or reduced pH lowers haemoglobin oxygen affinity', 'Oxygenation lowers the amount of CO₂ blood can carry', 'A fall in haemoglobin concentration lowers oxygen content', 'Increased cardiac output increases oxygen delivery'], 'Increased CO₂ and/or reduced pH lowers haemoglobin oxygen affinity', 'The Bohr effect describes how CO₂ and hydrogen ions affect oxygen binding. In active tissues, added CO₂ and increased acidity favour a right shift and oxygen release. Remember the direction: CO₂/pH changes influence O₂ affinity.'),
+            mcq('t_haldane', 2, 'At the same PCO₂, deoxygenated blood can carry more CO₂ than oxygenated blood. What is this called?', ['The Haldane effect', 'The Bohr effect', 'Positive cooperative oxygen binding', 'The oxygen cascade'], 'The Haldane effect', 'The Haldane effect describes how haemoglobin oxygenation affects CO₂ carriage. Deoxygenated haemoglobin buffers hydrogen ions more effectively and forms carbamino compounds more readily, helping blood carry CO₂ from tissues. CO₂ carriage includes bicarbonate as well as directly bound CO₂.'),
+            mcq('t_haldane_lung', 2, 'How does oxygen loading in the lungs help carbon dioxide removal?', ['Oxygenation reduces blood CO₂-carrying capacity and promotes CO₂ release', 'Oxygenation makes haemoglobin retain more CO₂ at the same PCO₂', 'Oxygenation converts CO₂ into O₂', 'Oxygenation prevents bicarbonate conversion back to CO₂'], 'Oxygenation reduces blood CO₂-carrying capacity and promotes CO₂ release', 'This is the Haldane effect in the lungs. Oxygenated haemoglobin binds fewer hydrogen ions and less carbamino CO₂. Released hydrogen ions combine with bicarbonate, helping regenerate CO₂ for exhalation. This complements the diffusion gradient towards alveolar gas.'),
+            mcq('t_compare_effects', 2, 'Which statement correctly distinguishes the Bohr and Haldane effects?', ['Bohr: CO₂/pH affects O₂ binding; Haldane: oxygenation affects CO₂ carriage', 'Bohr: oxygenation affects CO₂ carriage; Haldane: pH affects O₂ binding', 'Both effects describe only changes in haemoglobin concentration', 'Both effects describe only diffusion through the alveolar membrane'], 'Bohr: CO₂/pH affects O₂ binding; Haldane: oxygenation affects CO₂ carriage', 'Keep the causal direction clear. Bohr asks how CO₂ and acidity alter haemoglobin affinity for oxygen. Haldane asks how oxygenation alters blood CO₂-carrying capacity. They work together during gas exchange but are not the same effect.'),
+            mcq('t_double_mother', 2, 'In the placenta, maternal blood takes up CO₂ from the fetus. What does the local rise in CO₂ and acidity favour?', ['A maternal right shift and oxygen unloading', 'A maternal left shift and stronger oxygen retention', 'A conversion of maternal haemoglobin into fetal haemoglobin', 'An increase in maternal oxygen affinity caused by CO₂'], 'A maternal right shift and oxygen unloading', 'CO₂ moves from fetal towards maternal blood. Maternal blood locally becomes more acidic, reducing haemoglobin oxygen affinity and favouring release of oxygen. This is the maternal half of the double Bohr effect; maternal and fetal blood remain separate circulations.'),
+            mcq('t_double_fetus', 2, 'Fetal blood loses CO₂ across the placenta. What does the resulting local rise in fetal pH favour?', ['A fetal left shift and oxygen loading', 'A fetal right shift and oxygen unloading', 'A rise in fetal P₅₀ and reduced affinity', 'A loss of all haemoglobin oxygen-binding sites'], 'A fetal left shift and oxygen loading', 'As fetal blood loses CO₂, its pH rises locally, increasing haemoglobin oxygen affinity. This favours oxygen uptake. This is the fetal half of the double Bohr effect and adds to the intrinsically higher affinity of fetal haemoglobin.'),
+            mcq('t_double_bohr', 2, 'Why is the placental effect called the double Bohr effect?', ['CO₂ transfer promotes maternal O₂ unloading and fetal O₂ loading at the same time', 'Both maternal and fetal oxygen curves shift right', 'Both maternal and fetal oxygen curves shift left', 'Maternal blood directly mixes with fetal blood to exchange haemoglobin'], 'CO₂ transfer promotes maternal O₂ unloading and fetal O₂ loading at the same time', 'One CO₂ transfer produces two complementary Bohr responses: maternal CO₂ rises and pH falls, favouring a right shift; fetal CO₂ falls and pH rises, favouring a left shift. Both favour oxygen transfer from mother to fetus. The effect supplements, rather than replaces, the oxygen partial-pressure gradient.'),
+            mcq('t_double_haldane', 2, 'What does the double Haldane effect help achieve in the placenta?', ['Fetal oxygenation promotes CO₂ release while maternal deoxygenation promotes CO₂ uptake', 'Both fetal and maternal oxygenation prevent CO₂ transfer', 'CO₂ transfer changes maternal haemoglobin into fetal haemoglobin', 'It explains only the higher oxygen affinity of fetal haemoglobin'], 'Fetal oxygenation promotes CO₂ release while maternal deoxygenation promotes CO₂ uptake', 'Fetal blood gains oxygen, reducing its CO₂-carrying capacity and favouring CO₂ release. Maternal blood loses oxygen, increasing its CO₂-carrying capacity and favouring uptake. Together these Haldane responses assist CO₂ transfer from fetus to mother. Double Bohr concerns oxygen affinity; double Haldane concerns CO₂ carriage.'),
+        ])
+        order = ['t_pressure', 't_dissolved', 't_anaemia', 't_axes', 't_cooperative', 't_plateau', 't_steep', 't_p50', 't_along', 't_shift', 't_left', 't_factors', 't_cold', 't_alkalosis', 't_dpg', 't_stored', 't_hbf', 't_co', 't_bohr', 't_haldane', 't_haldane_lung', 't_compare_effects', 't_double_mother', 't_double_fetus', 't_double_bohr', 't_double_haldane', 't_anchor', 't_content', 't_delivery', 't_units']
+        by_id = {item["id"]: item for item in q}
+        q = [by_id[qid] for qid in order]
     # Distribute answer positions once, identically for every candidate and retry.
     rng = random.Random(20261020)
     for item in q:
@@ -230,15 +254,16 @@ def validate_report(payload):
         datetime.fromisoformat(r["submitted_utc"])
         if r.get("pressure_unit") not in ("kPa","mmHg"):
             raise ValueError("Invalid pressure unit")
-        if not isinstance(r.get("items"),list) or len(r["items"]) != 12:
-            raise ValueError("Expected 12 marked items")
         expected = {q["id"]:q["objective"] for q in make_questions(r["topic"],0)}
+        count = len(expected)
+        if not isinstance(r.get("items"),list) or len(r["items"]) != count:
+            raise ValueError(f"Expected {count} marked items for this topic and question set")
         if {x.get("id") for x in r["items"]} != set(expected):
             raise ValueError("Question IDs are missing or duplicated")
         if any(type(x.get("earned")) is not int or x["earned"] not in (0,1) or x.get("objective") != expected[x["id"]] for x in r["items"]):
             raise ValueError("Invalid item marks or objectives")
         score = sum(x["earned"] for x in r["items"])
-        if r.get("score") != score or r.get("total") != 12 or r.get("percentage") != round(100*score/12,1):
+        if r.get("score") != score or r.get("total") != count or r.get("percentage") != round(100*score/count,1):
             raise ValueError("Inconsistent score")
         if not isinstance(r.get("duration_seconds"),(int,float)) or not math.isfinite(r["duration_seconds"]) or r["duration_seconds"] < 0:
             raise ValueError("Invalid duration")
@@ -382,7 +407,8 @@ document.getElementById('clear').onclick=blank;document.getElementById('save').o
 
 
 def sketch_viva(topic):
-    st.subheader("Sketch it, then explain it")
+    st.subheader("Tutor interaction · sketch and viva")
+    st.caption("Use the same core prompts with each candidate. Allow 15 minutes: sketch 4 minutes, core viva 8 minutes, feedback 3 minutes. Extra prompts are for guided teaching after the core viva.")
     st.caption("This task requires tutor review; it is not included in the automatic quiz score. The canvas is temporary—download your sketch before leaving this page.")
     if topic == "cascade":
         st.write("Draw the cascade for a healthy adult at rest on room air at sea level. Label approximate values, state your units and conditions, and explain each fall. Add mixed venous PO₂ as a separate returning-blood reference.")
@@ -393,11 +419,17 @@ def sketch_viva(topic):
         rubric = ["PO₂ on x-axis, saturation (%) on y-axis; sigmoid curve","P₅₀ ≈3.5–3.6 kPa at 50% saturation","Approximate anchors: 5.3 kPa≈75%, 8.0 kPa≈90%, 13.3 kPa≈97–98%; explain steep and plateau regions","Explain cooperative binding","Right shift: increased P₅₀, lower affinity; list heat/CO₂/H⁺/2,3-DPG","Distinguish pressure/saturation/content and calculate CaO₂ and DO₂ with correct units"]
         viva = ["What is the difference between PaO₂, SaO₂ and CaO₂?", "Why is the dissociation curve S-shaped?", "What does P₅₀ mean?", "Name two factors causing a right shift and explain unloading.", "Why can oxygen content be low despite a normal saturation in anaemia?", "Calculate DO₂ for CaO₂ 20 mL/dL and cardiac output 5 L/min."]
     components.html(CANVAS,height=390)
+    st.markdown("**Core viva — use with every candidate**")
+    for i, question in enumerate(viva, 1):
+        st.write(f"{i}. {question}")
+    if topic == "transport":
+        with st.expander("Extra teaching prompts: Bohr, Haldane and placental exchange"):
+            st.write("Explain the Bohr effect. How is it different from the Haldane effect?")
+            st.write("What happens to maternal and fetal oxygen affinity when CO₂ crosses the placenta?")
+            st.write("Explain how the double Bohr and double Haldane effects assist placental gas exchange.")
     with st.expander("Tutor/self-review checklist and viva prompts"):
         for i,item in enumerate(rubric):
             st.checkbox(item,key=f"rubric_{topic}_{i}")
-        for question in viva:
-            st.write("• "+question)
     st.text_area("Your explanation or tutor feedback (optional, temporary)",key=f"viva_{topic}")
     notes = st.session_state.get(f"viva_{topic}","")
     st.download_button("Download viva notes",notes,file_name=f"{topic}_viva_notes.txt",mime="text/plain")
@@ -405,15 +437,18 @@ def sketch_viva(topic):
 
 def assessment(topic, unit, learner):
     st.subheader("Individual formative assessment")
-    st.caption("12 items · 1 mark each · no negative marking. Numerical tolerances are shown. Everyone receives the same questions, numbers and answer choices in the same order. Questions build from understanding to straightforward application. All pressures are in kPa. This is an open-resource teaching test, not a secure examination.")
+    st.caption(f"{len(make_questions(topic))} items · 1 mark each · no negative marking. Numerical tolerances are shown. Everyone receives the same questions, numbers and answer choices in the same order. Questions build from understanding to straightforward application. All pressures are in kPa. This is an open-resource teaching test, not a secure examination.")
     key = f"attempt_{topic}"
     attempt = st.session_state.get(key)
+    if attempt and attempt.get("bank_version") != "2026-10-20-expanded":
+        del st.session_state[key]
+        attempt = None
     if not attempt:
         if st.button("Start assessment",type="primary",key=f"start_{topic}"):
             if not learner.strip():
                 st.error("Enter a learner code in the sidebar first.")
                 return
-            attempt = {"id":str(uuid.uuid4()),"learner":learner.strip(),"unit":unit,"started":time.time(),"questions":make_questions(topic,0,"kPa"),"result":None}
+            attempt = {"bank_version":"2026-10-20-expanded","id":str(uuid.uuid4()),"learner":learner.strip(),"unit":unit,"started":time.time(),"questions":make_questions(topic,0,"kPa"),"result":None}
             st.session_state[key] = attempt
             st.rerun()
         return
@@ -477,7 +512,7 @@ def reports():
 
 
 def tutor_dashboard():
-    st.header("Tutor review")
+    st.header("Group results")
     st.write("Ask each learner to download their results JSON and submit it through your usual teaching channel. Upload those files here to compare results and identify learning needs.")
     st.caption("Files are self-reported and unauthenticated. This panel reads only files you upload; it cannot access other learners' live sessions.")
     uploads = st.file_uploader("Upload individual Oxygen Lab JSON reports",type=["json"],accept_multiple_files=True)
@@ -522,7 +557,7 @@ def lesson(topic):
         for i,label in OBJECTIVES[topic].items():
             st.write(f"{i}. {label}")
         st.table([{"Time":a,"Focus":b} for a,b in rows])
-        st.caption("Use a few selected questions live; the full 12-item test can be completed after teaching if five minutes is insufficient.")
+        st.caption("Use selected questions during teaching. The full assessment is for independent practice: 12 cascade questions or 30 transport questions. Allow roughly 20–30 minutes for the transport set, adjusted to the learner.")
 
 
 def references():
@@ -540,7 +575,11 @@ Sources for further reading:
 
 1. [Collins et al. — Relating oxygen partial pressure, saturation and content (Breathe, 2015)](https://pmc.ncbi.nlm.nih.gov/articles/PMC4666443/).
 2. [Popel — Theory of oxygen transport to tissue](https://pmc.ncbi.nlm.nih.gov/articles/PMC5445261/).
-3. [Oxygen transport: basic principles (BMJ)](https://pmc.ncbi.nlm.nih.gov/articles/PMC1114207/).
+3. [Placental gas exchange: Bohr and Haldane effects (2023)](https://pubmed.ncbi.nlm.nih.gov/36527666/).
+4. [Experimental Haldane effect](https://pubmed.ncbi.nlm.nih.gov/1757157/).
+5. [Fetal/adult haemoglobin and 2,3-DPG](https://pubmed.ncbi.nlm.nih.gov/5009828/).
+6. [Carbon monoxide and oxygen binding](https://pubmed.ncbi.nlm.nih.gov/3976/).
+7. [Oxygen transport: basic principles (BMJ)](https://pmc.ncbi.nlm.nih.gov/articles/PMC1114207/).
 4. [Neethling — The Oxygen Cascade, anaesthesia refresher course](https://anaesthetics.ukzn.ac.za/wp-content/uploads/2024/09/Oxygen-cascade-Ref-2021.pdf).
 5. [Streamlit deployment guide](https://docs.streamlit.io/deploy/streamlit-community-cloud/deploy-your-app/deploy).
 
@@ -557,8 +596,8 @@ def main():
         st.header("Learning workspace")
         learner = st.text_input("Learner code",max_chars=80,key="learner_code",placeholder="e.g. DM-01",help="Use a code rather than a full name. It is captured when an assessment starts.")
         unit = "kPa"
-        st.caption("Pressure units: kPa throughout.")
-        page = st.radio("Open",["Oxygen cascade","Oxygen transport","My results","Tutor review","Sources & assumptions"],key="page")
+        st.caption("Pressure units: kPa throughout. Assessment → Interaction → Tutor interaction.")
+        page = st.radio("Open",["Oxygen cascade","Oxygen transport","My results","Group results","Sources & assumptions"],key="page")
         st.caption("Each browser connection has its own session. Download results before refreshing. No login or central database is included.")
         if st.button("Clear session for next learner",key="clear_session"):
             for key in list(st.session_state):
@@ -567,16 +606,16 @@ def main():
     if page in ("Oxygen cascade","Oxygen transport"):
         topic = "cascade" if page=="Oxygen cascade" else "transport"
         lesson(topic)
-        mode = st.radio("Activity",["Explore & calculate","Sketch & viva","Assessment"],horizontal=True,key=f"mode_{topic}")
-        if mode=="Explore & calculate":
+        mode = st.radio("Activity",["Assessment","Interaction","Tutor interaction"],horizontal=True,key=f"mode_{topic}")
+        if mode=="Interaction":
             cascade_lab(unit) if topic=="cascade" else transport_lab(unit)
-        elif mode=="Sketch & viva":
+        elif mode=="Tutor interaction":
             sketch_viva(topic)
         else:
             assessment(topic,unit,learner)
     elif page=="My results":
         reports()
-    elif page=="Tutor review":
+    elif page=="Group results":
         tutor_dashboard()
     else:
         references()
