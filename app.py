@@ -9,6 +9,9 @@ import csv
 import io
 import json
 import math
+import os
+import hmac
+import hashlib
 import random
 import re
 import time
@@ -23,8 +26,8 @@ import streamlit.components.v1 as components
 MMHG_PER_KPA = 7.50062
 TOPICS = {"cascade": "Oxygen cascade", "transport": "Oxygen transport"}
 OBJECTIVES = {
-    "cascade": {1: "Label the cascade", 2: "Explain each fall", 3: "Use the alveolar gas equation"},
-    "transport": {1: "Pressure, saturation and content", 2: "Dissociation curve and shifts", 3: "Content and delivery"},
+    "cascade": {1: "Draw and label the cascade", 2: "Explain each fall in PO₂", 3: "Use the alveolar gas equation", 4: "Apply altitude and gas-exchange changes"},
+    "transport": {1: "Curve shape and cooperative binding", 2: "P₅₀ and right/left shifts", 3: "Loading, unloading and Bohr/Haldane effects", 4: "Pressure, saturation, content and delivery"},
 }
 BLUE, TEAL, ORANGE = "#005EB8", "#007F86", "#C65D13"
 
@@ -86,6 +89,71 @@ def mcq(qid, objective, prompt, options, correct, explanation):
 def numeric(qid, objective, prompt, answer, tolerance, unit, explanation):
     return dict(id=qid, objective=objective, type="number", prompt=prompt,
                 answer=answer, tolerance=tolerance, unit=unit, explanation=explanation)
+
+
+def tutor_password():
+    value = os.environ.get("TUTOR_PASSWORD", "")
+    if not value:
+        try:
+            value = st.secrets.get("TUTOR_PASSWORD", "")
+        except (FileNotFoundError, KeyError):
+            value = ""
+    return value if isinstance(value, str) and len(value) >= 12 else ""
+
+
+def is_tutor():
+    password = tutor_password()
+    if not password:
+        return False
+    fingerprint = hashlib.sha256(password.encode("utf-8")).hexdigest()
+    return hmac.compare_digest(str(st.session_state.get("tutor_token", "")), fingerprint)
+
+
+def require_tutor():
+    if not is_tutor():
+        st.error("Tutor sign-in required.")
+        st.stop()
+
+
+def tutor_sign_in():
+    if is_tutor():
+        st.success("Tutor signed in")
+        if st.button("Lock tutor access", key="lock_tutor"):
+            st.session_state.pop("tutor_token", None)
+            for key in ("page", "mode_cascade", "mode_transport"):
+                st.session_state.pop(key, None)
+            st.rerun()
+        return
+    with st.expander("Tutor sign-in"):
+        with st.form("tutor_login", clear_on_submit=True):
+            entered = st.text_input("Tutor password", type="password", key="tutor_password_input", max_chars=256)
+            submitted = st.form_submit_button("Unlock tutor access")
+        if submitted:
+            if time.time() < st.session_state.get("tutor_retry_after", 0):
+                st.error("Please wait briefly before trying again.")
+                return
+            password = tutor_password()
+            if password and hmac.compare_digest(entered.encode("utf-8"), password.encode("utf-8")):
+                st.session_state["tutor_token"] = hashlib.sha256(password.encode("utf-8")).hexdigest()
+                st.session_state["tutor_failures"] = 0
+                for key in ("page", "mode_cascade", "mode_transport"):
+                    st.session_state.pop(key, None)
+                st.rerun()
+            failures = st.session_state.get("tutor_failures", 0) + 1
+            st.session_state["tutor_failures"] = failures
+            st.session_state["tutor_retry_after"] = time.time() + min(60, 2 ** min(failures, 6))
+            st.error("Tutor access could not be unlocked. Check your password and configuration.")
+
+
+def student_submission(records):
+    # No key, explanations, per-item marks or scores enter student downloads.
+    fields = ("learner_code", "topic", "attempt_id", "submitted_utc", "duration_seconds", "pressure_unit")
+    attempts = []
+    for record in records:
+        clean = {key: record[key] for key in fields}
+        clean["items"] = [{"id": item["id"], "response": item["response"]} for item in record["items"]]
+        attempts.append(clean)
+    return {"schema_version": 1, "report_type": "responses_only", "attempts": attempts}
 
 
 def make_questions(topic, seed=0, unit="kPa"):
@@ -189,8 +257,8 @@ def make_questions(topic, seed=0, unit="kPa"):
             mcq('t_axes', 2, 'Which axes should you label on an oxyhaemoglobin dissociation curve?', ['PO₂ (kPa) horizontally; haemoglobin saturation (%) vertically', 'Haemoglobin concentration horizontally; PO₂ vertically', 'Cardiac output horizontally; saturation vertically', 'Saturation horizontally; oxygen delivery vertically'], 'PO₂ (kPa) horizontally; haemoglobin saturation (%) vertically', 'The curve relates oxygen partial pressure to haemoglobin saturation. It does not directly plot oxygen content or delivery. Always label units and state reference conditions.'),
             mcq('t_steep', 2, 'What does the steep part of the dissociation curve help the tissues do?', ['Extract a substantial amount of oxygen for a relatively small fall in PO₂', 'Maintain identical saturation at every tissue PO₂', 'Increase the amount of haemoglobin in each red cell', 'Prevent oxygen leaving haemoglobin'], 'Extract a substantial amount of oxygen for a relatively small fall in PO₂', 'Along the steep region, a modest fall in PO₂ produces a relatively large fall in saturation. Oxygen is released from haemoglobin and can diffuse into the tissues. This is movement along a curve, not necessarily a shift of the curve.'),
             mcq('t_left', 2, 'At the same PO₂, what does a left-shifted curve mean?', ['Higher oxygen affinity, lower P₅₀ and higher saturation', 'Lower oxygen affinity, higher P₅₀ and lower saturation', 'Higher haemoglobin concentration with unchanged affinity', 'Higher cardiac output with unchanged affinity'], 'Higher oxygen affinity, lower P₅₀ and higher saturation', 'A left shift means haemoglobin binds oxygen more readily: less PO₂ is needed for 50% saturation. At a fixed tissue PO₂ it holds onto more oxygen, which can make unloading more difficult. Affinity and total oxygen delivery are different concepts.'),
-            mcq('t_cold', 2, 'A patient becomes colder. With pH, CO₂ and 2,3-DPG unchanged, which change is expected?', ['A left shift with increased oxygen affinity', 'A right shift with decreased oxygen affinity', 'A rise in haemoglobin concentration without any affinity change', 'A right shift with decreased P₅₀'], 'A left shift with increased oxygen affinity', 'Lower temperature favours a left shift and lower P₅₀. Higher temperature has the opposite effect. The statement concerns haemoglobin affinity with the other variables held constant.'),
-            mcq('t_alkalosis', 2, 'Blood pH rises while temperature and 2,3-DPG remain unchanged. What happens to the oxygen dissociation curve?', ['It shifts left, increasing oxygen affinity', 'It shifts right, decreasing oxygen affinity', 'Its shift is determined only by haemoglobin concentration', 'Its P₅₀ rises because oxygen affinity increases'], 'It shifts left, increasing oxygen affinity', 'Higher pH means fewer hydrogen ions. This favours higher oxygen affinity and a left shift. Lower pH favours a right shift and oxygen unloading: this pH dependence is part of the Bohr effect.'),
+            mcq('t_cold', 2, 'A patient cools from 37°C to 32°C. With pH, CO₂ and 2,3-DPG unchanged, which change is expected?', ['A left shift with increased oxygen affinity', 'A right shift with decreased oxygen affinity', 'A rise in haemoglobin concentration without any affinity change', 'A right shift with decreased P₅₀'], 'A left shift with increased oxygen affinity', 'Lower temperature favours a left shift and lower P₅₀. Higher temperature has the opposite effect. The statement concerns haemoglobin affinity with the other variables held constant.'),
+            mcq('t_alkalosis', 2, 'Blood pH rises from 7.40 to 7.55 while temperature and 2,3-DPG remain unchanged. What happens to the oxygen dissociation curve?', ['It shifts left, increasing oxygen affinity', 'It shifts right, decreasing oxygen affinity', 'Its shift is determined only by haemoglobin concentration', 'Its P₅₀ rises because oxygen affinity increases'], 'It shifts left, increasing oxygen affinity', 'Higher pH means fewer hydrogen ions. This favours higher oxygen affinity and a left shift. Lower pH favours a right shift and oxygen unloading: this pH dependence is part of the Bohr effect.'),
             mcq('t_dpg', 2, 'Why does an increase in red-cell 2,3-DPG shift the curve to the right?', ['It stabilises deoxygenated haemoglobin, reducing oxygen affinity', 'It increases the dissolved oxygen pressure directly', 'It converts adult haemoglobin into fetal haemoglobin', 'It adds extra oxygen-binding sites to haemoglobin'], 'It stabilises deoxygenated haemoglobin, reducing oxygen affinity', '2,3-DPG, also called 2,3-BPG, binds preferentially to deoxygenated adult haemoglobin and stabilises its lower-affinity state. More PO₂ is then needed for 50% saturation, so P₅₀ rises. This can aid unloading.'),
             mcq('t_along', 2, 'PO₂ falls, but pH, temperature, CO₂, 2,3-DPG and haemoglobin type stay the same. How should you describe the resulting fall in saturation?', ['Movement down the same dissociation curve', 'A right shift of the entire curve', 'A left shift of the entire curve', 'A necessary change in P₅₀'], 'Movement down the same dissociation curve', 'Changing PO₂ alone moves the operating point along the existing curve. A shift means saturation at the same PO₂ has changed because affinity has changed. Do not call every fall in saturation a right shift.'),
             mcq('t_hbf', 2, 'Why does fetal haemoglobin have a higher oxygen affinity than adult haemoglobin in red cells?', ['Its gamma chains interact less strongly with 2,3-DPG', 'It has more than four oxygen-binding sites', 'It contains no haem groups', 'It binds 2,3-DPG more strongly than adult haemoglobin'], 'Its gamma chains interact less strongly with 2,3-DPG', 'Fetal haemoglobin has gamma rather than beta chains and interacts less strongly with 2,3-DPG. Its curve is therefore relatively left-shifted, helping oxygen uptake at the lower PO₂ found in the placenta. This intrinsic difference is separate from the dynamic double Bohr effect.'),
@@ -208,6 +276,53 @@ def make_questions(topic, seed=0, unit="kPa"):
         order = ['t_pressure', 't_dissolved', 't_anaemia', 't_axes', 't_cooperative', 't_plateau', 't_steep', 't_p50', 't_along', 't_shift', 't_left', 't_factors', 't_cold', 't_alkalosis', 't_dpg', 't_stored', 't_hbf', 't_co', 't_bohr', 't_haldane', 't_haldane_lung', 't_compare_effects', 't_double_mother', 't_double_fetus', 't_double_bohr', 't_double_haldane', 't_anchor', 't_content', 't_delivery', 't_units']
         by_id = {item["id"]: item for item in q}
         q = [by_id[qid] for qid in order]
+    if topic == "transport":
+        q.extend([
+            mcq('t_hemes', 2, 'How many oxygen molecules can one fully oxygenated normal adult haemoglobin molecule carry?', ['Four: one O₂ molecule at each of four haem groups', 'One: all four chains share one binding site', 'Two: only the beta chains bind oxygen', 'Eight: each haem binds two O₂ molecules'], 'Four: one O₂ molecule at each of four haem groups', 'Adult HbA is a tetramer with two alpha and two beta chains. Each chain contains a haem group with ferrous iron, and each haem can bind one oxygen molecule. One haemoglobin molecule can therefore bind four O₂ molecules, meaning eight oxygen atoms.'),
+            mcq('t_occupancy', 2, 'What happens to haemoglobin as oxygen binds progressively to its haem groups?', ['Binding favours the higher-affinity R state, making further oxygen binding easier', 'Each oxygen molecule destroys a neighbouring haem group', 'The molecule becomes a single chain like myoglobin', 'The remaining sites necessarily become less able to bind oxygen'], 'Binding favours the higher-affinity R state, making further oxygen binding easier', 'Oxygen binding changes the local iron–haem environment and the interactions between globin subunits, favouring the relaxed, higher-affinity R state over the tense, lower-affinity T state. This allosteric communication explains positive cooperativity and the sigmoid curve; the haem groups do not pass oxygen directly between one another.'),
+            mcq('t_p75', 2, 'On a normal adult curve at 37°C and pH 7.4, which PO₂ is closest to that giving 75% saturation (P₇₅)?', ['5.3 kPa', '3.5 kPa', '8.0 kPa', '13.3 kPa'], '5.3 kPa', 'The usual teaching point is approximately 5.3 kPa at 75% saturation, near normal mixed venous values at rest. This is an approximate reference, not a fixed value in every organ. Lower tissue PO₂ encourages oxygen release on the steep part of the curve.'),
+            mcq('t_p90', 2, 'On a normal adult curve, which PO₂ is closest to that giving 90% saturation (P₉₀)?', ['8.0 kPa', '3.5 kPa', '5.3 kPa', '20.0 kPa'], '8.0 kPa', 'Approximately 8.0 kPa corresponds to 90% saturation under standard teaching conditions. Below this region, further reductions in PO₂ can cause a relatively rapid fall in saturation. Temperature, pH and other affinity changes alter these relationships.'),
+            mcq('t_p100', 2, 'Is there a single universal PO₂ that should be quoted as P₁₀₀, meaning exactly 100% haemoglobin saturation?', ['No; the curve approaches full saturation and the value depends on conditions and measurement', 'Yes; 13.3 kPa always means exactly 100% saturation', 'Yes; 8.0 kPa always means exactly 100% saturation', 'Yes; 3.5 kPa always means exactly 100% saturation'], 'No; the curve approaches full saturation and the value depends on conditions and measurement', 'For standard teaching, PaO₂ around 13.3 kPa corresponds to roughly 97–98% saturation, not a guaranteed exact 100%. The plateau approaches full saturation, and measured displays can round to 100%. Do not invent a universal finite P₁₀₀; state the saturation, PO₂ and reference conditions.'),
+            mcq('t_lung_tissue', 2, 'How do local gas exchange conditions help loading in lungs and unloading in metabolically active tissues?', ['Tissue CO₂ gain and lower pH favour unloading; pulmonary CO₂ loss and higher pH favour loading', 'The curve is permanently right-shifted in lungs and left-shifted in active tissues', 'Oxygen can load only if haemoglobin concentration increases each breath', 'CO₂ loss in the lungs lowers pH and reduces oxygen affinity'], 'Tissue CO₂ gain and lower pH favour unloading; pulmonary CO₂ loss and higher pH favour loading', 'Active tissues add CO₂ and hydrogen ions, favouring reduced oxygen affinity through the Bohr effect; local warming may further favour unloading. In the lungs, CO₂ removal raises pH and favours affinity and loading. PO₂ also changes along the curve; both changes in gradient and local affinity contribute. HbF is prominent in newborns and is progressively replaced by HbA after birth, so infant affinity depends partly on age and the mixture of haemoglobins.'),
+        ])
+        by_id = {item["id"]: item for item in q}
+        q = [by_id[qid] for qid in ['t_pressure', 't_dissolved', 't_anaemia', 't_hemes', 't_occupancy', 't_axes', 't_cooperative', 't_plateau', 't_steep', 't_p50', 't_p75', 't_p90', 't_p100', 't_along', 't_shift', 't_left', 't_factors', 't_cold', 't_alkalosis', 't_dpg', 't_stored', 't_hbf', 't_co', 't_bohr', 't_lung_tissue', 't_haldane', 't_haldane_lung', 't_compare_effects', 't_double_mother', 't_double_fetus', 't_double_bohr', 't_double_haldane', 't_anchor', 't_content', 't_delivery', 't_units']]
+    if topic == "cascade":
+        q.extend([
+            mcq('c_aadiff', 3, 'PAO₂ is 13.4 kPa and PaO₂ is 10.0 kPa. What is the alveolar–arterial oxygen difference?', ['3.4 kPa', '23.4 kPa', '0.75 kPa', '13.4 kPa'], '3.4 kPa', 'Subtract arterial from alveolar PO₂: 13.4 − 10.0 = 3.4 kPa. A is alveolar; a is arterial. Interpretation depends on age, FiO₂ and the clinical context.'),
+            mcq('c_purehypov', 2, 'In isolated hypoventilation with otherwise normal lungs, what happens to the A–a oxygen difference?', ['It may remain normal despite reduced arterial PO₂', 'It must become very large', 'It becomes equal to atmospheric pressure', 'It measures cardiac output rather than oxygen exchange'], 'It may remain normal despite reduced arterial PO₂', 'Hypoventilation lowers alveolar PO₂, and arterial PO₂ falls with it. A wide A–a difference suggests an additional gas-exchange abnormality such as V/Q mismatch, shunt or diffusion limitation.'),
+            mcq('c_lowvq', 2, 'What happens to gas in an alveolus receiving too little ventilation for its blood flow?', ['Its PO₂ falls and its PCO₂ rises towards venous values', 'Its PO₂ rises towards dry-air values', 'Its gas becomes identical to inspired oxygen', 'Its PO₂ is determined only by haemoglobin concentration'], 'Its PO₂ falls and its PCO₂ rises towards venous values', 'In a low-V/Q unit, relatively little fresh oxygen arrives compared with uptake by blood; CO₂ removal is also reduced. Blood leaving such units can lower arterial oxygenation when it mixes with blood from better ventilated regions.'),
+            mcq('c_shunt', 2, 'Why may a substantial right-to-left shunt respond poorly to increasing inspired oxygen?', ['Some blood bypasses ventilated alveoli and cannot load oxygen there', 'High FiO₂ lowers alveolar PO₂', 'Shunted blood contains no haemoglobin', 'Oxygen cannot dissolve in blood at any pressure'], 'Some blood bypasses ventilated alveoli and cannot load oxygen there', 'Oxygen raises PO₂ in ventilated units, but the shunted fraction does not contact that alveolar gas. Its admixture limits the arterial response. This is a physiological explanation, not a claim that supplemental oxygen never helps.'),
+            mcq('c_anaemia_pa', 2, 'In isolated anaemia with normal ventilation and lung gas exchange, what may happen to PaO₂?', ['It can remain normal despite reduced oxygen content', 'It must fall in proportion to haemoglobin concentration', 'It necessarily rises to inspired PO₂', 'It becomes equal to P₅₀'], 'It can remain normal despite reduced oxygen content', 'PaO₂ measures dissolved oxygen tension, not the amount carried on haemoglobin. Anaemia can lower oxygen content and delivery without lowering PaO₂. Distinguish hypoxaemia from low oxygen content and tissue hypoxia.'),
+            mcq('c_diffusion', 2, 'Which change directly reduces the rate of oxygen diffusion across the alveolar–capillary membrane, other factors unchanged?', ['An increase in membrane thickness', 'An increase in exchange surface area', 'An increase in the oxygen partial-pressure gradient', 'A decrease in membrane thickness'], 'An increase in membrane thickness', 'Fick’s diffusion law relates transfer to surface area and the pressure gradient, and inversely to barrier thickness. A thicker barrier impedes diffusion. This is distinct from the Fick principle used to relate cardiac output to oxygen consumption.'),
+            mcq('c_exercise', 2, 'If local oxygen use rises without a matching rise in delivery, what happens to tissue oxygen extraction?', ['It initially rises and venous oxygen content falls', 'It stops because haemoglobin cannot unload oxygen', 'Venous oxygen content must rise', 'Arterial PO₂ must become zero immediately'], 'It initially rises and venous oxygen content falls', 'Tissues initially meet greater demand by extracting a larger fraction of delivered oxygen. Venous oxygen content and often venous PO₂ fall. Extraction has limits; if delivery cannot meet demand, tissue hypoxia can develop.'),
+            mcq('c_altadapt', 3, 'Why does hyperventilation partly improve alveolar PO₂ after ascent to altitude?', ['It lowers PaCO₂, reducing the subtraction term in the alveolar gas equation', 'It restores sea-level atmospheric pressure', 'It raises ambient oxygen fraction above 21%', 'It makes water vapour pressure zero'], 'It lowers PaCO₂, reducing the subtraction term in the alveolar gas equation', 'At a fixed altitude and FiO₂, lower PaCO₂ increases calculated PAO₂ because PaCO₂/R is smaller. This is compensation: inspired PO₂ is still reduced because barometric pressure remains lower.'),
+            numeric('c_alt1', 1, 'At approximately 1000 m, use the supplied PB = 89.9 kPa. Room air FiO₂ = 0.21 and PH₂O = 6.3 kPa. Calculate humidified PIO₂ = FiO₂ × (PB − PH₂O).', 17.556, 0.2, 'kPa', 'PIO₂ = 0.21 × (89.9 − 6.3) = 0.21 × 83.6 = 17.556 kPa, approximately 17.6 kPa. The oxygen fraction stays about 21%, but its partial pressure is lower than at sea level.'),
+            numeric('c_alt2', 3, 'At approximately 2000 m, PB = 79.5 kPa. Use FiO₂ = 0.21, PH₂O = 6.3 kPa, PaCO₂ = 5.3 kPa and R = 0.8. Calculate PAO₂ = FiO₂ × (PB − PH₂O) − PaCO₂/R. Assume no ventilatory adaptation.', 8.747, 0.2, 'kPa', 'Inspired term = 0.21 × 73.2 = 15.372 kPa. CO₂ term = 5.3/0.8 = 6.625 kPa. PAO₂ = 8.747, approximately 8.7 kPa. This stipulated fixed-CO₂ example is not a prediction of every person’s response to altitude.'),
+            numeric('c_alt3', 3, 'At approximately 3000 m, PB = 70.1 kPa. A hyperventilating person has PaCO₂ = 3.5 kPa. Use FiO₂ = 0.21, PH₂O = 6.3 kPa and R = 0.8 to calculate PAO₂.', 9.023, 0.2, 'kPa', 'PIO₂ = 0.21 × (70.1 − 6.3) = 13.398 kPa. PAO₂ = 13.398 − 3.5/0.8 = 9.023 kPa. Hyperventilation partly offsets the altitude-related fall. Compare only after checking both PB and PaCO₂.'),
+            numeric('c_alt4', 3, 'At the same altitude, PaCO₂ falls from 5.3 to 3.3 kPa. PIO₂ and R = 0.8 stay unchanged. By how many kPa does calculated PAO₂ increase? Use increase = fall in PaCO₂/R.', 2.5, 0.2, 'kPa', 'PaCO₂ falls by 2.0 kPa. The PAO₂ increase is 2.0/0.8 = 2.5 kPa. There is no need to know the altitude pressure for this difference calculation because PIO₂ is held fixed.'),
+            numeric('c_hypovnum', 3, 'PIO₂ = 20.0 kPa, PaCO₂ = 8.0 kPa and R = 0.8. Calculate PAO₂ = PIO₂ − PaCO₂/R during hypoventilation.', 10.0, 0.2, 'kPa', 'PAO₂ = 20.0 − 8.0/0.8 = 20.0 − 10.0 = 10.0 kPa. Increased alveolar CO₂ reduces the alveolar oxygen estimate at the same inspired oxygen pressure.'),
+            numeric('c_hyperventnum', 3, 'During hyperventilation at sea level, PaCO₂ is 3.2 kPa. Use PIO₂ = 20.0 kPa and R = 0.8. Calculate PAO₂.', 16.0, 0.2, 'kPa', 'PAO₂ = 20.0 − 3.2/0.8 = 20.0 − 4.0 = 16.0 kPa. Lower CO₂ raises alveolar PO₂ when the inspired conditions are unchanged.'),
+            numeric('c_supplementnum', 3, 'At sea level, FiO₂ = 0.40, PB = 101.3 kPa, PH₂O = 6.3 kPa, PaCO₂ = 5.3 kPa and R = 0.8. Estimate PAO₂ using the simplified alveolar gas equation.', 31.375, 0.2, 'kPa', 'Inspired term = 0.40 × 95.0 = 38.0 kPa. Subtract 5.3/0.8 = 6.625 kPa, giving 31.375, approximately 31.4 kPa. This is the simplified estimate; the fuller equation differs, particularly at higher FiO₂.'),
+            numeric('c_rqnum', 3, 'To isolate the effect of R, hold PIO₂ = 20.0 kPa and PaCO₂ = 5.3 kPa fixed, but use R = 1.0. Calculate PAO₂ = PIO₂ − PaCO₂/R.', 14.7, 0.2, 'kPa', 'PAO₂ = 20.0 − 5.3/1.0 = 14.7 kPa. At these fixed inputs, a higher R reduces the subtraction term. Real metabolic changes can also alter other variables; this question isolates the equation.'),
+            numeric('c_dryalt', 1, 'At approximately 4000 m, use PB = 61.6 kPa. For dry room air with FiO₂ = 0.21, calculate PO₂ = FiO₂ × PB. Do not subtract water vapour for dry air.', 12.936, 0.2, 'kPa', 'Dry-air PO₂ = 0.21 × 61.6 = 12.936, approximately 12.9 kPa. This is dry atmospheric PO₂, not humidified inspired, alveolar or arterial PO₂. These compartments must not be interchanged.'),
+            mcq("c_venous", 1, "Which value is closest to normal mixed venous PO₂ at rest, and how should it appear on a cascade diagram?", ["5.3 kPa, as a separate returning-blood reference after tissue extraction", "13.3 kPa, as the value in every mitochondrion", "20.0 kPa, between alveoli and arterial blood", "21.3 kPa, as a mandatory tissue diffusion intermediate"], "5.3 kPa, as a separate returning-blood reference after tissue extraction", "Mixed venous PO₂ is commonly about 5.3 kPa in a healthy adult at rest, varying with delivery and extraction. It represents blood returning after tissue extraction, not an extra compartment between tissue capillaries and mitochondria. Tissue and mitochondrial PO₂ are lower and variable."),
+        ])
+    if topic == "transport":
+        q.extend([
+            mcq("t_methaemoglobin", 4, "Why can methaemoglobinaemia impair oxygen delivery even when PaO₂ is normal?", ["Ferric iron cannot bind oxygen, and remaining ferrous sites may hold oxygen more tightly", "Methaemoglobin increases the number of useful oxygen-binding sites", "Methaemoglobin lowers oxygen content only by reducing atmospheric pressure", "Methaemoglobin converts dissolved oxygen directly into carbon dioxide"], "Ferric iron cannot bind oxygen, and remaining ferrous sites may hold oxygen more tightly", "In methaemoglobin, haem iron is oxidised from ferrous Fe²⁺ to ferric Fe³⁺ and cannot bind oxygen. Oxygen affinity at remaining functional sites can increase, impairing unloading. PaO₂ still measures dissolved oxygen and may be normal. Co-oximetry measures dyshemoglobin fractions; conventional saturation readings do not reliably describe this problem."),
+            mcq("t_hypoxaemia", 4, "How does hypoxaemia differ from isolated anaemia?", ["Hypoxaemia means low arterial PO₂; isolated anaemia can reduce content despite normal PaO₂", "Both always mean PaO₂ below 5.3 kPa", "Anaemia means low oxygen affinity with normal haemoglobin concentration", "Hypoxaemia is defined only by low cardiac output"], "Hypoxaemia means low arterial PO₂; isolated anaemia can reduce content despite normal PaO₂", "Hypoxaemia refers to reduced arterial oxygen partial pressure. Anaemia reduces haemoglobin available to carry oxygen; oxygen tension and saturation can remain normal. Both can reduce content and delivery, but through different mechanisms. Tissue hypoxia is inadequate oxygen availability or use at tissue level, not simply a synonym for low PaO₂."),
+        ])
+        curve = {"t_hemes", "t_occupancy", "t_axes", "t_cooperative", "t_plateau", "t_steep", "t_along"}
+        shifts = {"t_p50", "t_p75", "t_p90", "t_p100", "t_shift", "t_left", "t_factors", "t_cold", "t_alkalosis", "t_dpg", "t_stored", "t_hbf"}
+        effects = {"t_bohr", "t_lung_tissue", "t_haldane", "t_haldane_lung", "t_compare_effects", "t_double_mother", "t_double_fetus", "t_double_bohr", "t_double_haldane"}
+        for item in q:
+            item["objective"] = 1 if item["id"] in curve else 2 if item["id"] in shifts else 3 if item["id"] in effects else 4
+    else:
+        clinical = {"c_altitude", "c_high", "c_altadapt", "c_aadiff", "c_purehypov", "c_lowvq", "c_shunt", "c_anaemia_pa", "c_diffusion", "c_exercise", "c_alt1", "c_alt2", "c_alt3", "c_alt4", "c_dryalt"}
+        for item in q:
+            if item["id"] in clinical:
+                item["objective"] = 4
     # Distribute answer positions once, identically for every candidate and retry.
     rng = random.Random(20261020)
     for item in q:
@@ -245,6 +360,25 @@ def validate_report(payload):
     records = payload.get("attempts")
     if not isinstance(records,list) or not 1 <= len(records) <= 200:
         raise ValueError("Report must contain 1–200 attempts")
+    if payload.get("report_type") == "responses_only":
+        marked = []
+        for record in records:
+            if not isinstance(record, dict) or record.get("topic") not in TOPICS:
+                raise ValueError("Unknown topic")
+            bank = make_questions(record["topic"])
+            items = record.get("items", [])
+            if not isinstance(items, list) or len(items) != len(bank) or any(not isinstance(x, dict) for x in items):
+                raise ValueError("Incomplete response file")
+            responses = {item.get("id"): item.get("response") for item in items}
+            if set(responses) != {q["id"] for q in bank}:
+                raise ValueError("Question IDs do not match this test")
+            updated = dict(record)
+            updated["items"] = [dict(id=q["id"], objective=q["objective"], prompt=q["prompt"], response=responses[q["id"]], expected=q["answer"], earned=grade(q,responses[q["id"]]), explanation=q["explanation"]) for q in bank]
+            updated["score"] = sum(x["earned"] for x in updated["items"])
+            updated["total"] = len(bank)
+            updated["percentage"] = round(100 * updated["score"] / len(bank), 1)
+            marked.append(updated)
+        records = marked
     for r in records:
         if not isinstance(r,dict) or r.get("topic") not in TOPICS:
             raise ValueError("Unknown topic")
@@ -291,6 +425,7 @@ def cascade_plot(unit, values, reference=None):
 
 
 def cascade_lab(unit):
+    require_tutor()
     st.subheader("Follow the pressure gradient")
     st.caption("Healthy adult reference: rest, room air, sea level, 37°C, R = 0.8. Change one factor and predict before reading the graph.")
     presets = {"Sea-level reference":(.21,0,40,5),"Hypoventilation":(.21,0,60,5),"Altitude, fixed PaCO₂":(.21,2500,40,5),"Altitude with hyperventilation":(.21,2500,30,5),"Supplemental oxygen":(.40,0,40,5),"Widened A–a gradient":(.21,0,40,30)}
@@ -329,6 +464,7 @@ def cascade_lab(unit):
 
 
 def transport_lab(unit):
+    require_tutor()
     st.subheader("Pressure is not the amount carried")
     st.markdown("**PO₂:** oxygen tension · **SO₂:** occupied Hb binding sites · **Content:** oxygen per blood volume · **Delivery:** oxygen per minute.")
     st.markdown("**1 · Move the dissociation curve**")
@@ -407,6 +543,7 @@ document.getElementById('clear').onclick=blank;document.getElementById('save').o
 
 
 def sketch_viva(topic):
+    require_tutor()
     st.subheader("Tutor interaction · sketch and viva")
     st.caption("Use the same core prompts with each candidate. Allow 15 minutes: sketch 4 minutes, core viva 8 minutes, feedback 3 minutes. Extra prompts are for guided teaching after the core viva.")
     st.caption("This task requires tutor review; it is not included in the automatic quiz score. The canvas is temporary—download your sketch before leaving this page.")
@@ -437,10 +574,10 @@ def sketch_viva(topic):
 
 def assessment(topic, unit, learner):
     st.subheader("Individual formative assessment")
-    st.caption(f"{len(make_questions(topic))} items · 1 mark each · no negative marking. Numerical tolerances are shown. Everyone receives the same questions, numbers and answer choices in the same order. Questions build from understanding to straightforward application. All pressures are in kPa. This is an open-resource teaching test, not a secure examination.")
+    st.caption(f"{len(make_questions(topic))} questions · pressures in kPa · numerical tolerances are shown. Everyone receives the same questions. Answers, explanations and marks are reserved for tutor review.")
     key = f"attempt_{topic}"
     attempt = st.session_state.get(key)
-    if attempt and attempt.get("bank_version") != "2026-10-20-expanded":
+    if attempt and attempt.get("bank_version") != "2026-10-20-test-mode":
         del st.session_state[key]
         attempt = None
     if not attempt:
@@ -448,7 +585,7 @@ def assessment(topic, unit, learner):
             if not learner.strip():
                 st.error("Enter a learner code in the sidebar first.")
                 return
-            attempt = {"bank_version":"2026-10-20-expanded","id":str(uuid.uuid4()),"learner":learner.strip(),"unit":unit,"started":time.time(),"questions":make_questions(topic,0,"kPa"),"result":None}
+            attempt = {"bank_version":"2026-10-20-test-mode","id":str(uuid.uuid4()),"learner":learner.strip(),"unit":unit,"started":time.time(),"questions":make_questions(topic,0,"kPa"),"result":None}
             st.session_state[key] = attempt
             st.rerun()
         return
@@ -462,7 +599,7 @@ def assessment(topic, unit, learner):
                     answers[q["id"]] = st.radio("Choose one",q["options"],index=None,key=f"{attempt['id']}_{q['id']}",label_visibility="collapsed")
                 else:
                     answers[q["id"]] = st.text_input(f"Answer ({q['unit']})",key=f"{attempt['id']}_{q['id']}",help=f"Accepted tolerance ±{q['tolerance']:g} {q['unit']}. Enter a number only, with a decimal point.")
-            submitted = st.form_submit_button("Submit and show feedback",type="primary")
+            submitted = st.form_submit_button("Submit assessment",type="primary")
         if submitted:
             missing = [q for q in attempt["questions"] if answers[q["id"]] is None or str(answers[q["id"]]).strip()==""]
             invalid = [q for q in attempt["questions"] if q["type"]=="number" and str(answers[q["id"]]).strip() and parse_number(answers[q["id"]]) is None]
@@ -480,6 +617,10 @@ def assessment(topic, unit, learner):
             st.rerun()
         return
     result = attempt["result"]
+    if not is_tutor():
+        st.success("Assessment submitted. Your tutor will review your responses.")
+        st.download_button("Download submission for tutor", json.dumps(student_submission([result]), ensure_ascii=False, indent=2), file_name=f"oxygen_{topic}_{attempt['id'][:8]}_submission.json", mime="application/json")
+        return
     st.success(f"{result['score']}/{result['total']} — {result['percentage']:.1f}%")
     st.caption("Use objective-level feedback to choose revision. No validated pass/fail threshold is applied.")
     breakdown = []
@@ -499,6 +640,15 @@ def assessment(topic, unit, learner):
 
 
 def reports():
+    if not is_tutor():
+        st.header("My submissions")
+        records = st.session_state.get("results", [])
+        if not records:
+            st.info("No submitted assessments in this session.")
+            return
+        st.table([{"Learner": r["learner_code"], "Topic": TOPICS[r["topic"]], "Status": "Submitted"} for r in records])
+        st.download_button("Download my submissions for tutor", json.dumps(student_submission(records), ensure_ascii=False, indent=2), file_name="oxygen_submissions.json", mime="application/json")
+        return
     st.header("Your results")
     records = st.session_state.get("results",[])
     if not records:
@@ -512,6 +662,7 @@ def reports():
 
 
 def tutor_dashboard():
+    require_tutor()
     st.header("Group results")
     st.write("Ask each learner to download their results JSON and submit it through your usual teaching channel. Upload those files here to compare results and identify learning needs.")
     st.caption("Files are self-reported and unauthenticated. This panel reads only files you upload; it cannot access other learners' live sessions.")
@@ -551,16 +702,18 @@ def tutor_dashboard():
 
 
 def lesson(topic):
+    require_tutor()
     st.header(TOPICS[topic]+" · 15 minutes")
     rows = [("0–3 min","Draw and label typical values"),("3–6 min","Explain the fall at each stage"),("6–10 min","Gas equation and worked example"),("10–15 min","Individual assessment; sketch/viva discussion")] if topic=="cascade" else [("0–2 min","Pressure, saturation and content"),("2–6 min","Dissociation curve, P₅₀ and shifts"),("6–10 min","Content and delivery worked example"),("10–15 min","Individual assessment; sketch/viva discussion")]
     with st.expander("Learning objectives and teaching sequence"):
         for i,label in OBJECTIVES[topic].items():
             st.write(f"{i}. {label}")
         st.table([{"Time":a,"Focus":b} for a,b in rows])
-        st.caption("Use selected questions during teaching. The full assessment is for independent practice: 12 cascade questions or 30 transport questions. Allow roughly 20–30 minutes for the transport set, adjusted to the learner.")
+        st.caption("Use selected questions during teaching. The full assessment is for independent practice: 30 cascade questions or 38 transport questions. Allow roughly 25–35 minutes for either full set, adjusted to the learner.")
 
 
 def references():
+    require_tutor()
     st.header("Equations, assumptions and sources")
     st.markdown("""- All displayed pressure values use **kPa**.
 - Simplified alveolar gas equation: **PAO₂ ≈ FiO₂ × (PB − PH₂O) − PaCO₂/R**. At 37°C use PH₂O ≈6.3 kPa. Assume steady state and PACO₂ ≈ PaCO₂; R=0.8 for these exercises.
@@ -587,36 +740,59 @@ Built for Prof Madapura Shashidhara's MMed/DM and Primary FRCA teaching. AI-assi
 """)
 
 
+def marking_answers(topic):
+    require_tutor()
+    st.header(TOPICS[topic] + " · tutor answers")
+    for i, question in enumerate(make_questions(topic), 1):
+        with st.expander(f"{i}. {question['prompt']}"):
+            st.write(f"Correct answer: {question['answer']}")
+            st.write(question["explanation"])
+
+
 def main():
-    st.set_page_config(page_title="Oxygen Lab · MMed / DM / FRCA",page_icon="🫁",layout="wide")
-    st.markdown("<style>.block-container{max-width:1180px;padding-top:2rem}h1,h2,h3{color:#003B71}div[data-testid='stMetric']{background:#edf5fb;padding:16px;border-radius:9px}section[data-testid='stSidebar']{background:#f1f6fa}</style>",unsafe_allow_html=True)
+    st.set_page_config(page_title="Oxygen Lab · Primary FRCA", page_icon="🫁", layout="wide")
     st.title("Oxygen Lab")
-    st.caption("Explore → calculate → sketch → test · MMed / DM / Primary FRCA")
+    st.caption("Primary FRCA · oxygen cascade and transport")
     with st.sidebar:
-        st.header("Learning workspace")
-        learner = st.text_input("Learner code",max_chars=80,key="learner_code",placeholder="e.g. DM-01",help="Use a code rather than a full name. It is captured when an assessment starts.")
+        st.header("Assessment workspace")
+        tutor_sign_in()
+        tutor = is_tutor()
+        learner = st.text_input("Learner code", max_chars=80, key="learner_code", placeholder="e.g. DM-01")
         unit = "kPa"
-        st.caption("Pressure units: kPa throughout. Assessment → Interaction → Tutor interaction.")
-        page = st.radio("Open",["Oxygen cascade","Oxygen transport","My results","Group results","Sources & assumptions"],key="page")
-        st.caption("Each browser connection has its own session. Download results before refreshing. No login or central database is included.")
-        if st.button("Clear session for next learner",key="clear_session"):
+        st.caption("All pressures use kPa.")
+        pages = ["Oxygen cascade", "Oxygen transport", "My submissions"]
+        if tutor:
+            pages += ["Group results", "Marking & answers", "Sources & assumptions"]
+        if st.session_state.get("page") not in pages:
+            st.session_state["page"] = pages[0]
+        page = st.radio("Open", pages, key="page")
+        st.caption("Download your submission before closing this browser. Responses are session-local.")
+        if tutor and st.button("Clear session for next learner", key="clear_session"):
             for key in list(st.session_state):
                 del st.session_state[key]
             st.rerun()
-    if page in ("Oxygen cascade","Oxygen transport"):
-        topic = "cascade" if page=="Oxygen cascade" else "transport"
+    if page in ("Oxygen cascade", "Oxygen transport"):
+        topic = "cascade" if page == "Oxygen cascade" else "transport"
+        if not tutor:
+            st.header(TOPICS[topic] + " · assessment")
+            assessment(topic, unit, learner)
+            return
         lesson(topic)
-        mode = st.radio("Activity",["Assessment","Interaction","Tutor interaction"],horizontal=True,key=f"mode_{topic}")
-        if mode=="Interaction":
-            cascade_lab(unit) if topic=="cascade" else transport_lab(unit)
-        elif mode=="Tutor interaction":
+        mode = st.radio("Activity", ["Assessment", "Interaction", "Tutor interaction"], horizontal=True, key=f"mode_{topic}")
+        if mode == "Interaction":
+            cascade_lab(unit) if topic == "cascade" else transport_lab(unit)
+        elif mode == "Tutor interaction":
             sketch_viva(topic)
         else:
-            assessment(topic,unit,learner)
-    elif page=="My results":
+            assessment(topic, unit, learner)
+    elif page == "My submissions":
         reports()
-    elif page=="Group results":
+    elif page == "Group results":
         tutor_dashboard()
+    elif page == "Marking & answers":
+        require_tutor()
+        topic = st.selectbox("Topic", list(TOPICS), format_func=lambda value: TOPICS[value])
+        marking_answers(topic)
     else:
         references()
 
